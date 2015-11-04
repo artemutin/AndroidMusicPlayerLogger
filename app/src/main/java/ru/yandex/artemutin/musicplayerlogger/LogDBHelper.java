@@ -5,15 +5,9 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
 public class LogDBHelper extends SQLiteOpenHelper {
-    public static final String DB_NAME = "TrackLog";
+    public static final String DB_NAME = "TrackLog", LOG_TB_NAME = "track_log";
     public static final int DB_VERSION = 1;
-    enum TrackStatus {
-        PLAYING(0),
-        PLAYED(1),
-        SKIPPED(2);
-        TrackStatus(int val){};
-    }
-
+    enum colNames{A,B}
     /**
      * Create a helper object to create, open, and/or manage a database.
      * This method always returns very quickly.  The database is not actually
@@ -36,7 +30,7 @@ public class LogDBHelper extends SQLiteOpenHelper {
      */
     @Override
     public void onCreate(SQLiteDatabase db) {
-        db.execSQL("CREATE TABLE track_log (id INT PRIMARY KEY AUTO_INCREMENT, track VARCHAR(255) NOT NULL, " +
+        db.execSQL("CREATE TABLE "+ LOG_TB_NAME + "(id INT PRIMARY KEY AUTO_INCREMENT, track VARCHAR(255) NOT NULL, " +
                 "album VARCHAR(255), artist VARCHAR(255), datetime LONG NOT NULL, status TINYINT NOT NULL)");
         db.execSQL("CREATE TABLE transfer_log (id INT PRIMARY KEY AUTO_INCREMENT, first_track_id INT FOREIGN KEY REFERENCES track_log(id), " +
                 "last_track_id INT FOREIGN KEY REFERENCES track_log(id), datetime LONG NOT NULL)");
