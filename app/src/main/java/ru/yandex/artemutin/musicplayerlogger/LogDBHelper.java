@@ -7,7 +7,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 public class LogDBHelper extends SQLiteOpenHelper {
     public static final String DB_NAME = "TrackLog";
     public static final int DB_VERSION = 1;
-    public enum TrackStatus {
+    enum TrackStatus {
         PLAYING,
         PLAYED,
         SKIPPED
@@ -35,10 +35,10 @@ public class LogDBHelper extends SQLiteOpenHelper {
      */
     @Override
     public void onCreate(SQLiteDatabase db) {
-        db.execSQL("CREATE TABLE track_log (id INT PRIMARY KEY, track VARCHAR(255) NOT NULL, " +
-                "album VARCHAR(255), artist VARCHAR(255), datetime DATETIME NOT NULL, status TINYINT NOT NULL)");
-        db.execSQL("CREATE TABLE transfer_log (id INT PRIMARY KEY, first_track_id INT FOREIGN KEY REFERENCES track_log(id), " +
-                "last_track_id INT FOREIGN KEY REFERENCES track_log(id), datetime DATETIME)");
+        db.execSQL("CREATE TABLE track_log (id INT PRIMARY KEY AUTO_INCREMENT, track VARCHAR(255) NOT NULL, " +
+                "album VARCHAR(255), artist VARCHAR(255), datetime LONG NOT NULL, status TINYINT NOT NULL)");
+        db.execSQL("CREATE TABLE transfer_log (id INT PRIMARY KEY AUTO_INCREMENT, first_track_id INT FOREIGN KEY REFERENCES track_log(id), " +
+                "last_track_id INT FOREIGN KEY REFERENCES track_log(id), datetime LONG NOT NULL)");
     }
 
     /**
