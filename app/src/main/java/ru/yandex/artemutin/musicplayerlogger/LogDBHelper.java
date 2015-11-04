@@ -8,9 +8,10 @@ public class LogDBHelper extends SQLiteOpenHelper {
     public static final String DB_NAME = "TrackLog";
     public static final int DB_VERSION = 1;
     enum TrackStatus {
-        PLAYING,
-        PLAYED,
-        SKIPPED
+        PLAYING(0),
+        PLAYED(1),
+        SKIPPED(2);
+        TrackStatus(int val){};
     }
 
     /**
