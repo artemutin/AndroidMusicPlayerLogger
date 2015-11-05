@@ -33,12 +33,17 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
         int status;
         Date datetime;
         long duration;
+        /**
+         * @param db_id is for using in update status
+         */
+        long db_id;
 
         /**
          * constructor from database row
          * @param cursor
          */
         Track(Cursor cursor){
+            db_id = cursor.getLong(0);
             track = cursor.getString(1);
             album = cursor.getString(2);
             artist = cursor.getString(3);
@@ -80,6 +85,7 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
 
     private LogDBHelper helper;
     private Context context;
+    private final static long DUR_EPS = 5000L;//5 seconds
     private final static String PREFS_NAME = "PlayerIntentsReceiverPreferences";
     private long startTimeStamp, timeWasPlaying;//unix time
 
@@ -111,7 +117,14 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
         getDBw().insert(LogDBHelper.LOG_TB_NAME, null, vals);
     }
 
-    private void saveTime() {
+    private void updateLastTrackState(Track previousTrack, int status){
+        ContentValues vals = previousTrack.getColumnValues();
+        vals.put("datetime", System.currentTimeMillis());
+        vals.put("status", status);
+        //TODO: in question, need i use all cols or only updated
+        getDBw().update(LogDBHelper.LOG_TB_NAME, vals, "id = " + String.valueOf(previousTrack.db_id), null );
+    }
+    private void saveTime(Track track) {
         SharedPreferences timePrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = timePrefs.edit();
         //this time has a problem - it can be changed by user
@@ -119,6 +132,10 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
         //TODO: make it right way, not depending on reboot and user time change
         editor.putLong("startTimeStamp", System.currentTimeMillis());
         editor.putLong("timeWasPlaying", timeWasPlaying);
+        if (track.duration == 0L){
+            throw new RuntimeException("Track must have a duration.");
+        }
+        editor.putLong("duration", track.duration);
     }
 
     @Override
@@ -151,11 +168,31 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
             Track previousTrack = getPreviousTrack();
             if (previousTrack == null) {
                 //very rare, but still valid state
-                saveTime();
+                saveTime(currentTrack);
                 saveCurrentTrack(currentTrack, Track.PLAYING);
             }
+
+            SharedPreferences timePrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            long startTimeStamp = timePrefs.getLong("startTimeStamp", 0);
+            long timeWasPlaying = timePrefs.getLong("timeWasPlaying", 0);
+            previousTrack.duration = timePrefs.getLong("duration", 0);
             if (currentTrack.equals(previousTrack)) {
-                //tracks are equal
+               //was paused or smth
+
+                //TODO: not finished
+            }else{
+                long timeDiff = System.currentTimeMillis() - startTimeStamp;
+                if (timeDiff < 0){
+                    throw new RuntimeException("Incorrect time diff.");
+                }
+
+                if (previousTrack.duration - timeDiff > DUR_EPS){
+                    //track was skipped
+                    saveTime(currentTrack);
+                    //modify previous track log
+                    updateLastTrackState(previousTrack, Track.SKIPPED);
+                    saveCurrentTrack(currentTrack, Track.PLAYING);
+                }
             }
 
         }
