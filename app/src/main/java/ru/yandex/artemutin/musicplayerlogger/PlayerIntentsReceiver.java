@@ -16,8 +16,7 @@ import java.sql.Date;
 import java.util.HashMap;
 
 public class PlayerIntentsReceiver extends BroadcastReceiver {
-    public PlayerIntentsReceiver() {
-    }
+
     static class Track{
         final static int PLAYING = 0, PLAYED = 1, SKIPPED = 2;
 
@@ -83,11 +82,16 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
         }
     }
 
-    private LogDBHelper helper;
-    private Context context;
+    //constants
     private final static long DUR_EPS = 5000L;//5 seconds
     private final static String PREFS_NAME = "PlayerIntentsReceiverPreferences";
+    private final static String LOG_PREF = "Logger";
+
+
+    private LogDBHelper helper;
+    private Context context;
     private long startTimeStamp, timeWasPlaying;//unix time
+
 
     private SQLiteDatabase getDBr(){
         return helper.getReadableDatabase();
@@ -124,6 +128,7 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
         //TODO: in question, need i use all cols or only updated
         getDBw().update(LogDBHelper.LOG_TB_NAME, vals, "id = " + String.valueOf(previousTrack.db_id), null );
     }
+
     private void saveTime(Track track) {
         SharedPreferences timePrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = timePrefs.edit();
@@ -140,7 +145,7 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        Log.d("Logger", "Intent was received");
+        Log.d(LOG_PREF, "Intent was received");
         /////////////////////////////////////////
 
         //IMPORTANT INIT BEFORE ANY FURTHER ACTION
@@ -151,12 +156,16 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
         /////////////////////////////////////////
 
         boolean isPlaying = intent.getBooleanExtra("playing", false);
-
+        Track previousTrack = getPreviousTrack();
 
         if (!isPlaying) {
             Track lastTrack = getPreviousTrack();
             if (lastTrack == null) {
+                Log.w(LOG_PREF, "No tracks were played and no one playing now.");
                 return; //no tracks were played, neither playing now
+            }else{
+                //possibly it is true stop. No skip state anyway
+                updateLastTrackState(previousTrack, Track.PLAYED);
             }
         }
         if (isPlaying ) {
@@ -165,7 +174,7 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
                 //TODO: find duration by song id
                 throw new UnsupportedOperationException("Incoming intent must contain non-null duration");
             }
-            Track previousTrack = getPreviousTrack();
+
             if (previousTrack == null) {
                 //very rare, but still valid state
                 saveTime(currentTrack);
@@ -174,25 +183,39 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
 
             SharedPreferences timePrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             long startTimeStamp = timePrefs.getLong("startTimeStamp", 0);
-            long timeWasPlaying = timePrefs.getLong("timeWasPlaying", 0);
+            timeWasPlaying = timePrefs.getLong("timeWasPlaying", 0);
             previousTrack.duration = timePrefs.getLong("duration", 0);
             if (currentTrack.equals(previousTrack)) {
                //was paused or smth
 
-                //TODO: not finished
             }else{
-                long timeDiff = System.currentTimeMillis() - startTimeStamp;
-                if (timeDiff < 0){
+                //summary time of being played
+                timeWasPlaying = System.currentTimeMillis() - startTimeStamp + timeWasPlaying;
+                if (timeWasPlaying < 0){
                     throw new RuntimeException("Incorrect time diff.");
                 }
 
-                if (previousTrack.duration - timeDiff > DUR_EPS){
-                    //track was skipped
-                    saveTime(currentTrack);
-                    //modify previous track log
-                    updateLastTrackState(previousTrack, Track.SKIPPED);
-                    saveCurrentTrack(currentTrack, Track.PLAYING);
+                if (previousTrack.status == Track.PLAYING){//if last track saved in PLAYING state only
+                    if (previousTrack.duration - timeWasPlaying > DUR_EPS){
+                        //track was skipped
+                        //modify previous track log
+                        updateLastTrackState(previousTrack, Track.SKIPPED);
+                    }else if(Math.abs(previousTrack.duration - timeWasPlaying) < DUR_EPS){
+                        //track was completed normally
+                        updateLastTrackState(previousTrack, Track.PLAYED);
+                    }else if(timeWasPlaying - previousTrack.duration > DUR_EPS){
+                        //track played longer, than duration
+                        //Means some stop, without proper intent here.
+                        Log.w(LOG_PREF, "Music played longer than duration");
+                        updateLastTrackState(previousTrack, Track.PLAYED);
+
+                    }
+
                 }
+                //save current track in db
+                saveCurrentTrack(currentTrack, Track.PLAYING);
+                //save time in SharedPrefs
+                saveTime(currentTrack);
             }
 
         }
