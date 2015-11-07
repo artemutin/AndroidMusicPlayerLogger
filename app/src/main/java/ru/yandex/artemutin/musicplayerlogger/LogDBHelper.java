@@ -30,10 +30,11 @@ public class LogDBHelper extends SQLiteOpenHelper {
      */
     @Override
     public void onCreate(SQLiteDatabase db) {
-        db.execSQL("CREATE TABLE "+ LOG_TB_NAME + "(id INT PRIMARY KEY AUTO_INCREMENT, track VARCHAR(255) NOT NULL, " +
-                "album VARCHAR(255), artist VARCHAR(255), datetime LONG NOT NULL, status TINYINT NOT NULL)");
-        db.execSQL("CREATE TABLE transfer_log (id INT PRIMARY KEY AUTO_INCREMENT, first_track_id INT FOREIGN KEY REFERENCES track_log(id), " +
-                "last_track_id INT FOREIGN KEY REFERENCES track_log(id), datetime LONG NOT NULL)");
+        db.execSQL("CREATE TABLE "+ LOG_TB_NAME + "(id INT AUTO INCREMENT, track VARCHAR(255) NOT NULL, " +
+                "album VARCHAR(255), artist VARCHAR(255), datetime LONG NOT NULL, status TINYINT NOT NULL, PRIMARY KEY(id) );");
+        db.execSQL("CREATE TABLE transfer_log (id INT AUTO INCREMENT, first_track_id INT, " +
+                "last_track_id INT, datetime LONG NOT NULL, PRIMARY KEY(id), FOREIGN KEY (first_track_id) REFERENCES track_log(id)," +
+                "FOREIGN KEY (last_track_id) REFERENCES track_log(id) );");
     }
 
     /**

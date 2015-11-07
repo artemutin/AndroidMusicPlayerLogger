@@ -159,12 +159,14 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
         Track previousTrack = getPreviousTrack();
 
         if (!isPlaying) {
+            Log.v(LOG_PREF, "Track not playing");
             Track lastTrack = getPreviousTrack();
             if (lastTrack == null) {
                 Log.w(LOG_PREF, "No tracks were played and no one playing now.");
                 return; //no tracks were played, neither playing now
             }else{
                 //possibly it is true stop. No skip state anyway
+                Log.v(LOG_PREF, "Assume track was stopped.");
                 updateLastTrackState(previousTrack, Track.PLAYED);
             }
         }
@@ -177,6 +179,7 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
 
             if (previousTrack == null) {
                 //very rare, but still valid state
+                Log.v(LOG_PREF, "There was no previous track");
                 saveTime(currentTrack);
                 saveCurrentTrack(currentTrack, Track.PLAYING);
             }
@@ -187,21 +190,26 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
             previousTrack.duration = timePrefs.getLong("duration", 0);
             if (currentTrack.equals(previousTrack)) {
                //was paused or smth
-
+                Log.v(LOG_PREF, "Track was paused somehow.");
+                saveTime(currentTrack);
             }else{
                 //summary time of being played
+                Log.v(LOG_PREF, "Previous and current track not match.");
                 timeWasPlaying = System.currentTimeMillis() - startTimeStamp + timeWasPlaying;
                 if (timeWasPlaying < 0){
                     throw new RuntimeException("Incorrect time diff.");
                 }
 
                 if (previousTrack.status == Track.PLAYING){//if last track saved in PLAYING state only
+                    Log.v(LOG_PREF, "Previous track was in PLAYING state.");
                     if (previousTrack.duration - timeWasPlaying > DUR_EPS){
                         //track was skipped
                         //modify previous track log
+                        Log.v(LOG_PREF, "Previous track was skipped.");
                         updateLastTrackState(previousTrack, Track.SKIPPED);
                     }else if(Math.abs(previousTrack.duration - timeWasPlaying) < DUR_EPS){
                         //track was completed normally
+                        Log.v(LOG_PREF, "Previous track was peacefully complete.");
                         updateLastTrackState(previousTrack, Track.PLAYED);
                     }else if(timeWasPlaying - previousTrack.duration > DUR_EPS){
                         //track played longer, than duration
