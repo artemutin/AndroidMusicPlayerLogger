@@ -48,6 +48,7 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
             artist = cursor.getString(3);
             datetime = new Date(cursor.getLong(4));
             status = Track.getTrackStatus(cursor.getInt(5));
+            cursor.close();
         }
 
         /**
@@ -111,7 +112,7 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
                 , "id DESC"
                 , "1"//first row
         );
-        return lastTrack == null ? null : new Track(lastTrack);
+        return lastTrack.moveToFirst() ? new Track(lastTrack) : null;
     }
 
     private void saveCurrentTrack(Track track, int status) {
@@ -160,8 +161,8 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
 
         if (!isPlaying) {
             Log.v(LOG_PREF, "Track not playing");
-            Track lastTrack = getPreviousTrack();
-            if (lastTrack == null) {
+
+            if (previousTrack == null) {
                 Log.w(LOG_PREF, "No tracks were played and no one playing now.");
                 return; //no tracks were played, neither playing now
             }else{
@@ -169,6 +170,7 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
                 Log.v(LOG_PREF, "Assume track was stopped.");
                 updateLastTrackState(previousTrack, Track.PLAYED);
             }
+            return;
         }
         if (isPlaying ) {
             Track currentTrack = new Track(intent);
@@ -182,6 +184,7 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
                 Log.v(LOG_PREF, "There was no previous track");
                 saveTime(currentTrack);
                 saveCurrentTrack(currentTrack, Track.PLAYING);
+                return;
             }
 
             SharedPreferences timePrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
