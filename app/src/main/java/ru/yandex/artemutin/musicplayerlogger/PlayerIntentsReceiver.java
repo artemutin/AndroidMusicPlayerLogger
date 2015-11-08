@@ -74,8 +74,25 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
             return vals;
         }
 
-        public boolean equals(Track a) {
-            return track == a.track && album == a.album && artist == a.artist;
+        @Override
+        public int hashCode() {
+            int result = track.hashCode();
+            result = 31 * result + artist.hashCode();
+            result = 31 * result + album.hashCode();
+            return result;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            Track track1 = (Track) o;
+
+            if (!track.equals(track1.track)) return false;
+            if (!artist.equals(track1.artist)) return false;
+            return album.equals(track1.album);
+
         }
     }
 
@@ -87,7 +104,7 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
 
     private LogDBHelper helper;
     private Context context;
-    private long startTimeStamp, timeWasPlaying;//unix time
+    private TimePrefs timePrefs;//unix time
 
 
     private SQLiteDatabase getDBr(){
@@ -108,7 +125,18 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
                 , "id DESC"
                 , "1"//first row
         );
-        return lastTrack.moveToFirst() ? new Track(lastTrack) : null;
+        if (lastTrack.moveToFirst() ){
+            Track t = new Track(lastTrack);
+            t.duration = timePrefs.getDuration();
+            if (t.duration <= 0){
+                throw new RuntimeException("Duration is zero or lesser");
+            }
+
+            return t;
+
+        }else{
+            return null;
+        }
     }
 
     private void saveCurrentTrack(Track track, int status) {
@@ -140,8 +168,13 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
             setDuration(timePrefs.getLong("duration", 0));
         }
 
+        TimePrefs(boolean empty){
+            timePrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        }
+
         void fixTimeWasPlaying(){
-            this.setTimeWasPlaying(System.currentTimeMillis() - startTimeStamp + timeWasPlaying);
+            this.setTimeWasPlaying(timeWasPlaying +
+                    (startTimeStamp > 0 ? System.currentTimeMillis() - startTimeStamp : 0) );//addition, if the track was stopped
         }
 
         private void saveTime(boolean saveTimeStamp) {
@@ -187,11 +220,6 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
         }
     }
 
-    private long getPlayingTime(){
-
-
-
-    }
     @Override
     public void onReceive(Context context, Intent intent) {
         Log.d(LOG_PREF, "Intent was received");
@@ -200,11 +228,12 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
         //IMPORTANT INIT BEFORE ANY FURTHER ACTION
         this.context = context;//possibly incorrect
         this.helper = new LogDBHelper(context);
-        this.timeWasPlaying = 0L;
+        this.timePrefs = new TimePrefs();
 
         /////////////////////////////////////////
 
         boolean isPlaying = intent.getBooleanExtra("playing", false);
+
         Track previousTrack = getPreviousTrack();
 
         if (!isPlaying) {
@@ -230,7 +259,7 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
         }
         if (isPlaying ) {
             Track currentTrack = new Track(intent);
-            TimePrefs timePrefs = new TimePrefs();
+
             if (currentTrack.duration == 0L) {
                 //TODO: find duration by song id
                 throw new UnsupportedOperationException("Incoming intent must contain non-null duration");
@@ -253,7 +282,8 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
             }else{
                 //summary time of being played
                 Log.v(LOG_PREF, "Previous and current track not match.");
-                timeWasPlaying = System.currentTimeMillis() - startTimeStamp + timeWasPlaying;
+                timePrefs.fixTimeWasPlaying();
+                long timeWasPlaying = timePrefs.getTimeWasPlaying();
                 if (timeWasPlaying < 0){
                     throw new RuntimeException("Incorrect time diff.");
                 }
@@ -281,7 +311,9 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
                 //save current track in db
                 saveCurrentTrack(currentTrack, Track.PLAYING);
                 //save time in SharedPrefs
-                saveTime(currentTrack);
+                timePrefs = new TimePrefs(true);
+                timePrefs.setDuration(currentTrack.duration);
+                timePrefs.saveTime(true);
             }
 
         }
