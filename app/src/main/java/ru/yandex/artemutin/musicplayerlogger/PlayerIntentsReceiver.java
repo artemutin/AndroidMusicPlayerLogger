@@ -1,6 +1,5 @@
 package ru.yandex.artemutin.musicplayerlogger;
 
-import android.app.Application;
 import android.content.BroadcastReceiver;
 import android.content.ContentValues;
 import android.content.Context;
@@ -8,12 +7,9 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import android.database.sqlite.SQLiteOpenHelper;
 import android.os.Bundle;
 import android.util.Log;
 import java.sql.Date;
-
-import java.util.HashMap;
 
 public class PlayerIntentsReceiver extends BroadcastReceiver {
 
@@ -127,23 +123,75 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
         vals.put("datetime", System.currentTimeMillis());
         vals.put("status", status);
         //TODO: in question, need i use all cols or only updated
-        getDBw().update(LogDBHelper.LOG_TB_NAME, vals, "id = " + String.valueOf(previousTrack.db_id), null );
+        getDBw().update(LogDBHelper.LOG_TB_NAME, vals, "id = " + String.valueOf(previousTrack.db_id), null);
     }
 
-    private void saveTime(Track track) {
-        SharedPreferences timePrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        SharedPreferences.Editor editor = timePrefs.edit();
-        //this time has a problem - it can be changed by user
-        //from the other hand System.nanoTime is valid only during a boot
-        //TODO: make it right way, not depending on reboot and user time change
-        editor.putLong("startTimeStamp", System.currentTimeMillis());
-        editor.putLong("timeWasPlaying", timeWasPlaying);
-        if (track.duration == 0L){
-            throw new RuntimeException("Track must have a duration.");
+    private class TimePrefs{
+        private long timeWasPlaying;
+        private long startTimeStamp;
+        private long duration;
+        private SharedPreferences timePrefs;
+
+        TimePrefs(){
+            timePrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+
+            setStartTimeStamp(timePrefs.getLong("startTimeStamp", 0));
+            setTimeWasPlaying(timePrefs.getLong("timeWasPlaying", 0));
+            setDuration(timePrefs.getLong("duration", 0));
         }
-        editor.putLong("duration", track.duration);
+
+        void fixTimeWasPlaying(){
+            this.setTimeWasPlaying(System.currentTimeMillis() - startTimeStamp + timeWasPlaying);
+        }
+
+        private void saveTime(boolean saveTimeStamp) {
+            SharedPreferences.Editor editor = timePrefs.edit();
+            //this time has a problem - it can be changed by user
+            //from the other hand System.nanoTime is valid only during a boot
+            //TODO: make it right way, not depending on reboot and user time change
+            if (saveTimeStamp){
+                editor.putLong("startTimeStamp", System.currentTimeMillis());
+            }else{
+                editor.remove("startTimeStamp");
+            }
+            editor.putLong("timeWasPlaying", timeWasPlaying);
+            if (duration == 0L){
+                throw new RuntimeException("Track must have a duration.");
+            }
+            editor.putLong("duration", duration);
+            editor.apply();
+        }
+
+        long getTimeWasPlaying() {
+            return timeWasPlaying;
+        }
+
+        void setTimeWasPlaying(long timeWasPlaying) {
+            this.timeWasPlaying = timeWasPlaying;
+        }
+
+        long getStartTimeStamp() {
+            return startTimeStamp;
+        }
+
+        void setStartTimeStamp(long startTimeStamp) {
+            this.startTimeStamp = startTimeStamp;
+        }
+
+        long getDuration() {
+            return duration;
+        }
+
+        void setDuration(long duration) {
+            this.duration = duration;
+        }
     }
 
+    private long getPlayingTime(){
+
+
+
+    }
     @Override
     public void onReceive(Context context, Intent intent) {
         Log.d(LOG_PREF, "Intent was received");
@@ -166,14 +214,23 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
                 Log.w(LOG_PREF, "No tracks were played and no one playing now.");
                 return; //no tracks were played, neither playing now
             }else{
-                //possibly it is true stop. No skip state anyway
-                Log.v(LOG_PREF, "Assume track was stopped.");
-                updateLastTrackState(previousTrack, Track.PLAYED);
+                if (previousTrack.status != Track.PLAYING){
+                    //track was stopped already
+                    Log.v(LOG_PREF, "Track was already stopped.");
+                    return;
+                }
+                Log.v(LOG_PREF, "Assume track was paused.");
+                //updateLastTrackState(previousTrack, Track.PLAYED);
+                TimePrefs t = new TimePrefs();
+                t.fixTimeWasPlaying();
+                //save time without current timestamp
+                t.saveTime(false);
             }
             return;
         }
         if (isPlaying ) {
             Track currentTrack = new Track(intent);
+            TimePrefs timePrefs = new TimePrefs();
             if (currentTrack.duration == 0L) {
                 //TODO: find duration by song id
                 throw new UnsupportedOperationException("Incoming intent must contain non-null duration");
@@ -182,19 +239,17 @@ public class PlayerIntentsReceiver extends BroadcastReceiver {
             if (previousTrack == null) {
                 //very rare, but still valid state
                 Log.v(LOG_PREF, "There was no previous track");
-                saveTime(currentTrack);
+
+                timePrefs.setDuration(currentTrack.duration);
+                timePrefs.saveTime(true);
                 saveCurrentTrack(currentTrack, Track.PLAYING);
                 return;
             }
 
-            SharedPreferences timePrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            long startTimeStamp = timePrefs.getLong("startTimeStamp", 0);
-            timeWasPlaying = timePrefs.getLong("timeWasPlaying", 0);
-            previousTrack.duration = timePrefs.getLong("duration", 0);
             if (currentTrack.equals(previousTrack)) {
                //was paused or smth
                 Log.v(LOG_PREF, "Track was paused somehow.");
-                saveTime(currentTrack);
+                timePrefs.saveTime(true);
             }else{
                 //summary time of being played
                 Log.v(LOG_PREF, "Previous and current track not match.");
