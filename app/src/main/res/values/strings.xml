@@ -2,6 +2,7 @@
     <string name="app_name">MusicPlayerLogger</string>
     <string name="player_action">com.android.music.playstatechanged</string>
     <string name="title_activity_settings">Настройки</string>
+    <string name="sendButton">Отправить лог</string>
 
     <!-- Strings related to Settings -->
 
