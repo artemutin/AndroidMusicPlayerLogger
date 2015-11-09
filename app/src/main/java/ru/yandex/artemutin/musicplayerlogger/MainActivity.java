@@ -6,7 +6,9 @@ import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.Spinner;
 import android.widget.Toast;
 
 public class MainActivity extends AppCompatActivity {
@@ -18,9 +20,22 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        
-        Button sendButton = (Button) findViewById(R.id.button_sendLog);
-        sendButton.setOnClickListener(new View.OnClickListener() {
+        Spinner transactionTypes, outputFormats;
+        transactionTypes = (Spinner) findViewById(R.id.spinner_logTransaction);
+        outputFormats = (Spinner) findViewById(R.id.spinner_outputFormat);
+
+        //look to https://developer.android.com/intl/ru/guide/topics/ui/controls/spinner.html
+        ArrayAdapter<CharSequence> transactionTypesAdapter, outputFormatsAdapter;
+        transactionTypesAdapter = ArrayAdapter.createFromResource(this, R.array.transactionTypes, android.R.layout.simple_spinner_item);
+        outputFormatsAdapter = ArrayAdapter.createFromResource(this, R.array.outputFormats, android.R.layout.simple_spinner_item);
+        transactionTypesAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        outputFormatsAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        transactionTypes.setAdapter(transactionTypesAdapter);
+        outputFormats.setAdapter(outputFormatsAdapter);
+
+        Button sendLog = (Button) findViewById(R.id.button_sendLog);
+        sendLog.setOnClickListener(new View.OnClickListener() {
                                           @Override
                                           public void onClick(View v) {
                                               //get type of a log trans

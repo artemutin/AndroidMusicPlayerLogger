@@ -3,6 +3,13 @@
     <string name="player_action">com.android.music.playstatechanged</string>
     <string name="title_activity_settings">Настройки</string>
     <string name="sendButton">Отправить лог</string>
+    <string-array name="transactionTypes">
+        <item>Все новые</item>
+        <item>Повторить последнюю</item>
+    </string-array>
+    <string-array name="outputFormats">
+        <item>.csv</item>
+    </string-array>
 
     <!-- Strings related to Settings -->
 
